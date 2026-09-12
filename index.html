@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dejavu Decor</title>
+    <link rel="stylesheet" href="css/style_new.css" />
+  </head>
+  <body>
+    <div id="loginScreen" class="login-screen">
+      <div class="login-card">
+        <div class="brand-block">
+          <div class="brand-logo"><img src="dd2.svg" alt="
+Dejavu Decor" /></div>
+          <div>
+            <h1>Dejavu Decor</h1>
+            <p>ديجافو ليزر</p>
+          </div>
+        </div>
+        <form id="loginForm" autocomplete="off">
+          <div class="field">
+            <label>اسم المستخدم</label>
+            <input id="loginUsername" type="text" autocomplete="off" required />
+          </div>
+          <div class="field">
+            <label>كلمة المرور</label>
+            <input id="loginPassword" type="password" autocomplete="new-password" required />
+          </div>
+          <button type="submit" class="primary-btn large">تسجيل الدخول</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="app" class="app hidden">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="brand-row">
+            <div class="brand-logo"><img src="dd2.svg" alt="DEJAVU LASER" /></div>
+            <div>
+              <h2>DEJAVU LASER</h2>
+              <small>نظام إدارة ورشة الليزر</small>
+            </div>
+          </div>
+        </div>
+
+        <nav class="nav" id="navMenu">
+          <button class="nav-btn active" data-view="dashboard">لوحة التحكم</button>
+          <button class="nav-btn" data-view="workPrep">تجهيز الشغل</button>
+          <button class="nav-btn" data-view="salesOrders">أوامر البيع</button>
+          <button class="nav-btn" data-view="customers">العملاء</button>
+          <button class="nav-btn" data-view="inventory">الخامات والمخزون</button>
+          <button class="nav-btn" data-view="expenses">المصروفات</button>
+          <button class="nav-btn" data-view="cashBank">الخزينة والبنك</button>
+          <button class="nav-btn" data-view="decisions">القرارات الإدارية</button>
+          <button class="nav-btn" data-view="reports">التقارير</button>
+          <button class="nav-btn" data-view="users">المستخدمين والصلاحيات</button>
+          <button class="nav-btn" data-view="settings">الإعدادات</button>
+          <button class="nav-btn" data-view="audit">سجل النشاط</button>
+        </nav>
+      </aside>
+
+      <main class="main-area">
+        <header class="topbar">
+          <div>
+            <div class="page-label">DEJAVU LASER</div>
+            <h1>نظام إدارة وتشغيل ورشة ديجافو ليزر</h1>
+          </div>
+          <div class="topbar-actions">
+            <div class="user-pill" id="currentUserBadge">مدير النظام</div>
+            <button id="themeToggle" class="secondary-btn small" type="button" aria-label="تغيير المظهر">الوضع العادي</button>
+            <button id="logoutBtn" class="secondary-btn small">تسجيل الخروج</button>
+          </div>
+        </header>
+
+        <section id="dashboardView" class="view active">
+          <div class="dashboard-heading">
+            <div><span class="eyebrow">ملخص التشغيل</span><h2>نظرة سريعة على الورشة</h2></div>
+            <span class="dashboard-date" id="dashboardDate"></span>
+          </div>
+          <div id="dashboardKpis" class="kpi-grid"></div>
+          <div class="dashboard-section-title"><h3>آخر 10 عمليات</h3><span>تتحدث تلقائيًا مع كل عملية حفظ</span></div>
+          <div class="panel recent-activity-panel"><div id="dashboardRecentActivity" class="recent-activity-grid"></div></div>
+          <div class="dashboard-section-title"><h3>التحليل والمتابعة</h3><span>مؤشرات مرئية من بيانات الورشة الفعلية</span></div>
+          <div id="dashboardAnalysis" class="analysis-grid"></div>
+          <div class="charts-grid">
+            <div class="chart-box"><h3>المبيعات الشهرية</h3><div id="monthlySalesChart" class="bars"></div></div>
+            <div class="chart-box"><h3>الأرباح الشهرية</h3><div id="monthlyProfitChart" class="bars"></div></div>
+            <div class="chart-box"><h3>المصروفات حسب النوع</h3><div id="expenseByTypeChart" class="bars"></div></div>
+            <div class="chart-box"><h3>حالة أوامر الشغل</h3><div id="workStatusChart" class="bars"></div></div>
+            <div class="chart-box"><h3>استهلاك الخامات</h3><div id="materialUsageChart" class="bars"></div></div>
+            <div class="chart-box"><h3>الشغل حسب العميل</h3><div id="customerSalesChart" class="bars"></div></div>
+          </div>
+          <div class="dashboard-section-title"><h3>التقرير الشهري</h3><span>اختر الشهر لمراجعة الأداء المالي</span></div>
+          <div class="panel monthly-report-panel">
+            <div class="monthly-toolbar"><label for="dashboardMonth">الشهر</label><select id="dashboardMonth"></select></div>
+            <div id="dashboardMonthlySummary" class="monthly-summary-grid"></div>
+          </div>
+        </section>
+
+        <section id="workPrepView" class="view">
+          <div class="two-column">
+            <div class="panel">
+              <div class="panel-head"><h3>أوامر البيع</h3></div>
+              <div id="salesQueueList" class="stack-list"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><h3>تجهيز الشغل</h3></div>
+              <div id="workPrepDetail"></div>
+            </div>
+          </div>
+          <div class="panel archive-panel">
+            <div class="panel-head"><h3>سجل أوامر الشغل المكتملة</h3><span class="muted-label">للمعلومية والرجوع للبيانات</span></div>
+            <div id="completedWorkOrdersTable" class="table-wrap"></div>
+          </div>
+        </section>
+
+        <section id="salesOrdersView" class="view">
+          <div class="panel">
+            <div class="panel-head"><h3>إضافة أمر بيع جديد</h3></div>
+            <form id="salesOrderForm" class="multi-grid">
+              <div class="field"><label>رقم الطلب</label><input id="salesOrderNumber" type="text" required /></div>
+              <div class="field"><label>تاريخ الطلب</label><input id="salesOrderDate" type="date" required /></div>
+              <div class="field"><label>العميل</label><input id="salesOrderCustomer" type="text" required /></div>
+              <div class="field"><label>رقم الهاتف</label><input id="salesOrderPhone" type="text" /></div>
+              <div class="field wide"><label>وصف الشغل</label><input id="salesOrderDescription" type="text" required /></div>
+              <div class="field"><label>نوع الشغل</label><select id="salesOrderType"><option value="قطع ليزر">قطع ليزر</option><option value="نقش">نقش</option><option value="نقش وقطع">نقش وقطع</option></select></div>
+              <div class="field"><label>الخامة</label><select id="salesOrderMaterial"></select></div>
+              <div class="field"><label>طول التشغيل (سم)</label><input id="salesOrderCutLength" type="number" min="0" step="0.01" required /></div>
+              <div class="field"><label>عرض التشغيل (سم)</label><input id="salesOrderCutWidth" type="number" min="0" step="0.01" required /></div>
+              <div class="field"><label>الكمية</label><input id="salesOrderQuantity" type="number" min="1" value="1" required /></div>
+              <div class="field"><label>سعر الوحدة</label><input id="salesOrderUnitPrice" type="number" min="0" step="0.01" value="0" required /></div>
+              <div class="field"><label>الخصم</label><input id="salesOrderDiscount" type="number" min="0" step="0.01" value="0" /></div>
+              <div class="field"><label>العربون</label><input id="salesOrderDeposit" type="number" min="0" step="0.01" value="0" /></div>
+              <div class="field"><label>حساب العربون</label><select id="salesOrderDepositAccount"><option value="خزينة">خزينة</option><option value="بنك">بنك</option></select></div>
+              <div class="field"><label>تاريخ التسليم</label><input id="salesOrderDeliveryDate" type="date" required /></div>
+              <div class="field"><label>الأولوية</label><select id="salesOrderPriority"><option value="عادية">عادية</option><option value="مستعجلة">مستعجلة</option><option value="عالية">عالية</option></select></div>
+              <div class="field"><label>الحالة</label><select id="salesOrderStatus"><option value="مسودة">مسودة</option><option value="عرض سعر">عرض سعر</option><option value="مؤكد">مؤكد</option><option value="قيد التجهيز">قيد التجهيز</option><option value="قيد التنفيذ">قيد التنفيذ</option><option value="جاهز">جاهز</option><option value="تم التسليم">تم التسليم</option><option value="مكتمل">مكتمل</option><option value="ملغي">ملغي</option></select></div>
+              <div class="field wide"><label>ملاحظات</label><textarea id="salesOrderNotes" rows="3"></textarea></div>
+              <div class="field wide actions-row"><button type="submit" class="primary-btn">حفظ أمر البيع</button></div>
+            </form>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><h3>أوامر البيع</h3></div>
+            <div id="salesOrdersTable" class="table-wrap"></div>
+          </div>
+        </section>
+
+        <section id="customersView" class="view">
+          <div class="panel">
+            <div class="panel-head"><h3>إضافة عميل جديد</h3></div>
+            <form id="customerForm" class="multi-grid">
+              <div class="field"><label>اسم العميل</label><input id="customerName" type="text" required /></div>
+              <div class="field"><label>الهاتف</label><input id="customerPhone" type="text" /></div>
+              <div class="field"><label>البريد</label><input id="customerEmail" type="email" /></div>
+              <div class="field"><label>العنوان</label><input id="customerAddress" type="text" /></div>
+              <div class="field"><label>النشاط</label><input id="customerActivity" type="text" /></div>
+              <div class="field"><label>الحالة</label><select id="customerStatus"><option value="نشط">نشط</option><option value="مميز">مميز</option><option value="معلق">معلق</option></select></div>
+              <div class="field wide actions-row"><button type="submit" class="primary-btn">حفظ العميل</button></div>
+            </form>
+          </div>
+          <div class="panel"><div class="panel-head"><h3>قاعدة العملاء</h3></div><div id="customersTable" class="table-wrap"></div></div>
+        </section>
+
+        <section id="inventoryView" class="view">
+          <div class="panel">
+            <div class="panel-head"><h3>إضافة خامة جديدة</h3></div>
+            <form id="materialForm" class="multi-grid">
+              <div class="field"><label>اسم الخامة</label><input id="materialName" type="text" required /></div>
+              <div class="field"><label>النوع</label><input id="materialType" type="text" value="لوح" /></div>
+              <div class="field"><label>اللون</label><input id="materialColor" type="text" placeholder="شفاف، أسود..." /></div>
+              <div class="field"><label>السمك (مم)</label><input id="materialThickness" type="number" min="0" step="0.01" /></div>
+              <div class="field"><label>طول اللوح (سم)</label><input id="materialLength" type="number" min="0" step="0.01" required /></div>
+              <div class="field"><label>عرض اللوح (سم)</label><input id="materialWidth" type="number" min="0" step="0.01" required /></div>
+              <div class="field"><label>الوحدة</label><input id="materialUnit" type="text" value="لوح" /></div>
+              <div class="field"><label>الكمية</label><input id="materialQuantity" type="number" min="0" value="0" /></div>
+              <div class="field"><label>تكلفة الوحدة</label><input id="materialUnitCost" type="number" min="0" step="0.01" value="0" /></div>
+              <div class="field"><label>الحد الأدنى</label><input id="materialMinStock" type="number" min="0" value="0" /></div>
+              <div class="field"><label>المورد</label><input id="materialSupplier" type="text" /></div>
+              <div class="field"><label>مكان التخزين</label><input id="materialStorage" type="text" /></div>
+              <div class="field wide"><label>ملاحظات</label><textarea id="materialNotes" rows="2"></textarea></div>
+              <div class="field wide actions-row"><button type="submit" class="primary-btn">حفظ الخامة</button></div>
+            </form>
+          </div>
+          <div class="panel"><div class="panel-head"><h3>المخزون الحالي</h3></div><div id="materialsTable" class="table-wrap"></div></div>
+        </section>
+
+        <section id="expensesView" class="view">
+          <div class="panel">
+            <div class="panel-head"><h3>إضافة مصروف جديد</h3></div>
+            <form id="expenseForm" class="multi-grid">
+              <div class="field"><label>التاريخ</label><input id="expenseDate" type="date" required /></div>
+              <div class="field"><label>نوع المصروف</label><select id="expenseType"><option value="خامات">خامات</option><option value="إيجار">إيجار</option><option value="كهرباء">كهرباء</option><option value="صيانة">صيانة</option><option value="رواتب">رواتب</option><option value="نقل">نقل</option><option value="تسويق">تسويق</option><option value="أدوات">أدوات</option><option value="معدات">معدات</option><option value="خدمات">خدمات</option><option value="أخرى">أخرى</option></select></div>
+              <div class="field"><label>الوصف</label><input id="expenseDescription" type="text" required /></div>
+              <div class="field"><label>المبلغ</label><input id="expenseAmount" type="number" min="0" step="0.01" value="0" required /></div>
+              <div class="field"><label>طريقة الدفع</label><select id="expensePaymentMethod"><option value="نقدي">نقدي</option><option value="تحويل بنكي">تحويل بنكي</option><option value="شيك">شيك</option></select></div>
+              <div class="field"><label>الخزينة/البنك</label><select id="expenseAccount"><option value="خزينة">خزينة</option><option value="بنك">بنك</option></select></div>
+              <div class="field"><label>المورد</label><input id="expenseSupplier" type="text" /></div>
+              <div class="field"><label>أمر الشغل المرتبط</label><input id="expenseWorkOrder" type="text" /></div>
+              <div class="field wide"><label>ملاحظات</label><textarea id="expenseNotes" rows="2"></textarea></div>
+              <div class="field wide actions-row"><button type="submit" class="primary-btn">حفظ المصروف</button></div>
+            </form>
+          </div>
+          <div class="panel"><div class="panel-head"><h3>سجل المصروفات</h3></div><div id="expensesTable" class="table-wrap"></div></div>
+        </section>
+
+        <section id="cashBankView" class="view">
+          <div class="two-column">
+            <div class="panel">
+              <div class="panel-head"><h3>إضافة حركة خزينة</h3></div>
+              <form id="cashForm" class="multi-grid compact">
+                <div class="field"><label>التاريخ</label><input id="cashDate" type="date" required /></div>
+                <div class="field"><label>النوع</label><select id="cashType"><option value="دخل">دخل</option><option value="مصروف">مصروف</option></select></div>
+                <div class="field"><label>الوصف</label><input id="cashDescription" type="text" required /></div>
+                <div class="field"><label>المبلغ</label><input id="cashAmount" type="number" min="0" step="0.01" value="0" required /></div>
+                <div class="field wide"><label>تحصيل أمر بيع (اختياري)</label><select id="cashSalesOrder"><option value="">حركة عامة</option></select></div>
+                <div class="field wide actions-row"><button type="submit" class="primary-btn">حفظ حركة الخزينة</button></div>
+              </form>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><h3>إضافة حركة بنك</h3></div>
+              <form id="bankForm" class="multi-grid compact">
+                <div class="field"><label>التاريخ</label><input id="bankDate" type="date" required /></div>
+                <div class="field"><label>النوع</label><select id="bankType"><option value="دخل">دخل</option><option value="مصروف">مصروف</option></select></div>
+                <div class="field"><label>الوصف</label><input id="bankDescription" type="text" required /></div>
+                <div class="field"><label>المبلغ</label><input id="bankAmount" type="number" min="0" step="0.01" value="0" required /></div>
+                <div class="field wide"><label>تحصيل أمر بيع (اختياري)</label><select id="bankSalesOrder"><option value="">حركة عامة</option></select></div>
+                <div class="field wide actions-row"><button type="submit" class="primary-btn">حفظ حركة البنك</button></div>
+              </form>
+            </div>
+          </div>
+          <div class="summary-grid" id="cashBankSummary"></div>
+          <div class="panel"><div class="panel-head"><h3>الحركات الأخيرة</h3></div><div id="cashBankTransactions" class="table-wrap"></div></div>
+        </section>
+
+        <section id="decisionsView" class="view">
+          <div class="panel"><div class="panel-head"><h3>إضافة قرار إداري</h3></div><form id="decisionForm" class="multi-grid"><div class="field"><label>التاريخ</label><input id="decisionDate" type="date" required /></div><div class="field"><label>القرار</label><input id="decisionTitle" type="text" required /></div><div class="field"><label>السبب</label><input id="decisionReason" type="text" /></div><div class="field"><label>الحالة</label><select id="decisionStatus"><option value="موافق">موافق</option><option value="قيد التنفيذ">قيد التنفيذ</option><option value="مكتمل">مكتمل</option></select></div><div class="field wide"><label>ملاحظات</label><textarea id="decisionNotes" rows="2"></textarea></div><div class="field wide actions-row"><button type="submit" class="primary-btn">حفظ القرار</button></div></form></div>
+          <div class="panel"><div class="panel-head"><h3>سجل القرارات</h3></div><div id="decisionsTable" class="table-wrap"></div></div>
+        </section>
+
+        <section id="reportsView" class="view">
+          <div class="panel">
+            <div class="panel-head"><h3>التقارير</h3></div>
+            <div class="report-actions"><button class="primary-btn" data-report="csv">تصدير CSV</button><button class="secondary-btn" data-report="print">طباعة</button></div>
+            <div id="reportsSummary" class="summary-grid"></div>
+          </div>
+        </section>
+
+        <section id="usersView" class="view">
+          <div class="panel"><div class="panel-head"><h3>إضافة مستخدم جديد</h3></div><form id="userForm" class="multi-grid"><div class="field"><label>اسم المستخدم</label><input id="userUsername" type="text" required /></div><div class="field"><label>الاسم</label><input id="userName" type="text" required /></div><div class="field"><label>كلمة المرور</label><input id="userPassword" type="password" required /></div><div class="field"><label>الدور</label><select id="userRole"><option value="Admin">Admin</option><option value="Manager">Manager</option><option value="Production Operator">Production Operator</option><option value="Accountant">Accountant</option><option value="Viewer">Viewer</option></select></div><div class="field wide actions-row"><button type="submit" class="primary-btn">حفظ المستخدم</button></div></form></div>
+          <div class="panel"><div class="panel-head"><h3>قائمة المستخدمين</h3></div><div id="usersTable" class="table-wrap"></div></div>
+        </section>
+
+        <section id="settingsView" class="view">
+          <div class="panel">
+            <div class="panel-head"><h3>الإعدادات</h3></div>
+            <form id="settingsForm" class="multi-grid">
+              <div class="field"><label>اسم الشركة</label><input id="settingsCompanyName" type="text" /></div>
+              <div class="field"><label>العملة</label><input id="settingsCurrency" type="text" value="EGP" /></div>
+              <div class="field"><label>تنسيق التاريخ</label><input id="settingsDateFormat" type="text" value="DD/MM/YYYY" /></div>
+              <div class="field wide actions-row"><button type="submit" class="primary-btn">حفظ الإعدادات</button></div>
+            </form>
+          </div>
+        </section>
+
+        <section id="auditView" class="view">
+          <div class="panel"><div class="panel-head"><h3>سجل النشاط</h3></div><div id="auditTable" class="table-wrap"></div></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="js/app_new.js"></script>
+  </body>
+</html>
