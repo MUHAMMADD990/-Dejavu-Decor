@@ -35,9 +35,11 @@ Dejavu Decor" /></div>
       <aside class="sidebar">
         <div class="sidebar-header">
           <div class="brand-row">
-            <div class="brand-logo"><img src="dd2.svg" alt="DEJAVU LASER" /></div>
+            <div class="brand-logo"><img src="dd2.svg" alt="
+Dejavu Decor" /></div>
             <div>
-              <h2>DEJAVU LASER</h2>
+              <h2>
+Dejavu Decor</h2>
               <small>نظام إدارة ورشة الليزر</small>
             </div>
           </div>
@@ -62,7 +64,8 @@ Dejavu Decor" /></div>
       <main class="main-area">
         <header class="topbar">
           <div>
-            <div class="page-label">DEJAVU LASER</div>
+            <div class="page-label">
+Dejavu Decor</div>
             <h1>نظام إدارة وتشغيل ورشة ديجافو ليزر</h1>
           </div>
           <div class="topbar-actions">
@@ -123,12 +126,27 @@ Dejavu Decor" /></div>
               <div class="field"><label>العميل</label><input id="salesOrderCustomer" type="text" required /></div>
               <div class="field"><label>رقم الهاتف</label><input id="salesOrderPhone" type="text" /></div>
               <div class="field wide"><label>وصف الشغل</label><input id="salesOrderDescription" type="text" required /></div>
-              <div class="field"><label>نوع الشغل</label><select id="salesOrderType"><option value="قطع ليزر">قطع ليزر</option><option value="نقش">نقش</option><option value="نقش وقطع">نقش وقطع</option></select></div>
-              <div class="field"><label>الخامة</label><select id="salesOrderMaterial"></select></div>
-              <div class="field"><label>طول التشغيل (سم)</label><input id="salesOrderCutLength" type="number" min="0" step="0.01" required /></div>
-              <div class="field"><label>عرض التشغيل (سم)</label><input id="salesOrderCutWidth" type="number" min="0" step="0.01" required /></div>
+              <div class="field wide"><label>مسار التسعير</label><select id="salesOrderType"><option value="ليزر">ليزر</option><option value="3D">3D Printing</option></select><small class="field-hint">اختار نوع الشغل الأول عشان تظهر بيانات التسعير المناسبة.</small></div>
+              <div id="laserPricingFields" class="form-subsection wide">
+                <div class="field"><label>الخامة</label><select id="salesOrderMaterial"></select></div>
+                <div class="field"><label>طول التشغيل (سم)</label><input id="salesOrderCutLength" type="number" min="0" step="0.01" /></div>
+                <div class="field"><label>عرض التشغيل (سم)</label><input id="salesOrderCutWidth" type="number" min="0" step="0.01" /></div>
+                <div class="field"><label>دقائق تشغيل الليزر للقطعة</label><input id="salesOrderLaserMinutes" type="number" min="0" step="0.01" value="0" /></div>
+                <div class="field"><label>سعر الوحدة المحسوب تلقائيًا</label><input id="salesOrderUnitPrice" class="fixed-price-input" type="number" min="0" step="0.01" value="0" readonly /></div>
+                <div class="field"><label>سعر ساعة الليزر من ملف التسعير</label><output id="salesOrderLaserHourlyRate" class="fixed-price">200 ج.م / ساعة</output></div>
+                <div class="field"><label>هامش الربح من ملف التسعير</label><output id="salesOrderLaserProfitMargin" class="fixed-price">30%</output></div>
+              </div>
+              <div id="printing3dPricingFields" class="form-subsection wide hidden">
+                <div class="field"><label>وزن القطعة (جرام)</label><input id="salesOrderPrintWeight" type="number" min="0" step="0.01" value="0" /></div>
+                <div class="field"><label>نوع خامة الطباعة</label><select id="salesOrderPrintMaterialType"><option value="PLA">PLA</option><option value="ABS">ABS</option><option value="PETG">PETG</option><option value="TPU">TPU</option><option value="Resin">Resin</option><option value="أخرى">أخرى</option></select></div>
+                <div class="field"><label>لون خامة الطباعة</label><input id="salesOrderPrintMaterialColor" type="text" placeholder="أسود، أبيض..." /></div>
+                <div class="field"><label>ساعات الطباعة</label><input id="salesOrderPrintHours" type="number" min="0" step="0.01" value="0" /></div>
+                <div class="field"><label>سعر الجرام من ملف التسعير</label><output id="salesOrderPricePerGram" class="fixed-price">2.5 ج.م / جرام</output></div>
+                <div class="field"><label>سعر ساعة الطباعة من ملف التسعير</label><output id="salesOrderPrintHourlyRate" class="fixed-price">50 ج.م / ساعة</output></div>
+                <div class="field"><label>تجهيز / تصميم</label><input id="salesOrderSetupFee" type="number" min="0" step="0.01" value="0" /></div>
+                <div class="field"><label>إجمالي التسعير التلقائي</label><output id="salesOrderCalculatedPrice" class="calculated-price">0 ج.م</output></div>
+              </div>
               <div class="field"><label>الكمية</label><input id="salesOrderQuantity" type="number" min="1" value="1" required /></div>
-              <div class="field"><label>سعر الوحدة</label><input id="salesOrderUnitPrice" type="number" min="0" step="0.01" value="0" required /></div>
               <div class="field"><label>الخصم</label><input id="salesOrderDiscount" type="number" min="0" step="0.01" value="0" /></div>
               <div class="field"><label>العربون</label><input id="salesOrderDeposit" type="number" min="0" step="0.01" value="0" /></div>
               <div class="field"><label>حساب العربون</label><select id="salesOrderDepositAccount"><option value="خزينة">خزينة</option><option value="بنك">بنك</option></select></div>
@@ -269,6 +287,7 @@ Dejavu Decor" /></div>
       </main>
     </div>
 
+    <script src="data/pricing-config.js"></script>
     <script src="js/app_new.js"></script>
   </body>
 </html>

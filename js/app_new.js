@@ -1,5 +1,6 @@
 const STORAGE_KEY = 'dejavu_laser_erp_v1';
 const THEME_KEY = 'dejavu_laser_theme';
+const pricingConfig = window.DEJAVU_PRICING || { laser: { hourlyRate: 200 }, printing3D: { materialPricePerGram: 2.5, hourlyRate: 50 } };
 
 const rolePermissions = {
   dashboard: ['Admin', 'Manager', 'Accountant', 'Viewer'],
@@ -78,6 +79,10 @@ const els = {
   salesOrderForm: document.getElementById('salesOrderForm'),
   salesOrdersTable: document.getElementById('salesOrdersTable'),
   salesOrderMaterial: document.getElementById('salesOrderMaterial'),
+  salesOrderType: document.getElementById('salesOrderType'),
+  laserPricingFields: document.getElementById('laserPricingFields'),
+  printing3dPricingFields: document.getElementById('printing3dPricingFields'),
+  salesOrderCalculatedPrice: document.getElementById('salesOrderCalculatedPrice'),
   customerForm: document.getElementById('customerForm'),
   customersTable: document.getElementById('customersTable'),
   materialForm: document.getElementById('materialForm'),
@@ -147,6 +152,62 @@ function formatDate(value) {
   return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 function formatThickness(value) { const text = String(value ?? '').trim(); return text ? (/مم$/.test(text) ? text : `${text} مم`) : '—'; }
+function is3DOrder(order) { return order?.workType === '3D'; }
+function calculateOrderPricing(values) {
+  if (values.workType === '3D') {
+    const materialCost = values.printWeight * values.pricePerGram;
+    const machineCost = values.printHours * values.printHourlyRate;
+    const totalBeforeDiscount = (materialCost + machineCost) * values.quantity + values.setupFee;
+    return { materialCost, machineCost, setupFee: values.setupFee, totalBeforeDiscount, unitPrice: values.quantity > 0 ? totalBeforeDiscount / values.quantity : 0 };
+  }
+  const sheetArea = values.materialLength * values.materialWidth;
+  const pieceArea = values.cutLength * values.cutWidth;
+  const materialCost = sheetArea > 0 ? (pieceArea / sheetArea) * values.materialUnitCost : 0;
+  const machineCost = (values.laserMinutes / 60) * values.laserHourlyRate;
+  const costBeforeProfit = materialCost + machineCost;
+  const unitPrice = costBeforeProfit * (1 + values.laserProfitMargin);
+  const totalBeforeDiscount = values.quantity * unitPrice;
+  return { materialCost, machineCost, setupFee: 0, profitMargin: values.laserProfitMargin, costBeforeProfit, totalBeforeDiscount, unitPrice };
+}
+function updateSalesOrderPricing() {
+  const is3D = els.salesOrderType.value === '3D';
+  const fixed3D = pricingConfig.printing3D;
+  document.getElementById('salesOrderLaserHourlyRate').textContent = `${formatCurrency(pricingConfig.laser.hourlyRate)} / ساعة`;
+  document.getElementById('salesOrderLaserProfitMargin').textContent = `${(pricingConfig.laser.profitMargin * 100).toFixed(0)}%`;
+  document.getElementById('salesOrderPricePerGram').textContent = `${formatCurrency(fixed3D.materialPricePerGram)} / جرام`;
+  document.getElementById('salesOrderPrintHourlyRate').textContent = `${formatCurrency(fixed3D.hourlyRate)} / ساعة`;
+  els.laserPricingFields.classList.toggle('hidden', is3D);
+  els.printing3dPricingFields.classList.toggle('hidden', !is3D);
+  if (!is3D) {
+    const material = state.materials.find(item => item.id === document.getElementById('salesOrderMaterial').value);
+    const pricing = calculateOrderPricing({
+      workType: 'ليزر',
+      quantity: Number(document.getElementById('salesOrderQuantity').value || 0),
+      laserMinutes: Number(document.getElementById('salesOrderLaserMinutes').value || 0),
+      laserHourlyRate: pricingConfig.laser.hourlyRate,
+      laserProfitMargin: pricingConfig.laser.profitMargin,
+      cutLength: Number(document.getElementById('salesOrderCutLength').value || 0),
+      cutWidth: Number(document.getElementById('salesOrderCutWidth').value || 0),
+      materialLength: Number(material?.length || 0),
+      materialWidth: Number(material?.width || 0),
+      materialUnitCost: Number(material?.unitCost || 0),
+    });
+    document.getElementById('salesOrderUnitPrice').value = pricing.unitPrice.toFixed(2);
+    return;
+  }
+  const pricing = calculateOrderPricing({
+    workType: '3D',
+    quantity: Number(document.getElementById('salesOrderQuantity').value || 0),
+    laserMinutes: Number(document.getElementById('salesOrderLaserMinutes').value || 0),
+    laserHourlyRate: pricingConfig.laser.hourlyRate,
+    printWeight: Number(document.getElementById('salesOrderPrintWeight').value || 0),
+    printHours: Number(document.getElementById('salesOrderPrintHours').value || 0),
+    pricePerGram: fixed3D.materialPricePerGram,
+    printHourlyRate: fixed3D.hourlyRate,
+    setupFee: Number(document.getElementById('salesOrderSetupFee').value || 0),
+  });
+  els.salesOrderCalculatedPrice.textContent = formatCurrency(pricing.totalBeforeDiscount);
+}
 function userCan(section) { if (!currentUser) return false; return (rolePermissions[section] || []).includes(currentUser.role); }
 function logActivity(action, section, payload) { state.activityLogs.unshift({ id: uid('log'), user: currentUser?.name || 'النظام', operation: action, section, log: `${section} - ${action}`, dateTime: new Date().toISOString(), payload }); state.activityLogs = state.activityLogs.slice(0, 200); }
 function updateSelectedView(viewName) { state.ui.activeView = viewName; document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === `${viewName}View`)); document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === viewName)); }
@@ -414,9 +475,10 @@ function renderCompletedWorkOrders() {
       <td>${work.remainingPieces || 0} قطعة / ${Number(work.remainingArea || 0).toLocaleString('ar-EG')} سم²</td>
       <td>${formatCurrency(work.materialCost || 0)}</td>
       <td>${formatDate(work.completedAt)}</td>
+      <td><button class="primary-btn small" data-action="print-invoice" data-id="${work.salesOrderId}">فاتورة PDF</button></td>
     </tr>
   `).join('');
-  els.completedWorkOrdersTable.innerHTML = `<table><thead><tr><th>رقم أمر الشغل</th><th>العميل</th><th>الوصف</th><th>الخامة</th><th>مساحة التشغيل</th><th>المستهلك</th><th>الباقي</th><th>تكلفة الخامة</th><th>تاريخ الإغلاق</th></tr></thead><tbody>${rows || '<tr><td colspan="9">لا توجد أوامر شغل مكتملة</td></tr>'}</tbody></table>`;
+  els.completedWorkOrdersTable.innerHTML = `<table><thead><tr><th>رقم أمر الشغل</th><th>العميل</th><th>الوصف</th><th>الخامة</th><th>مساحة التشغيل</th><th>المستهلك</th><th>الباقي</th><th>تكلفة الخامة</th><th>تاريخ الإغلاق</th><th>الفاتورة</th></tr></thead><tbody>${rows || '<tr><td colspan="10">لا توجد أوامر شغل مكتملة</td></tr>'}</tbody></table>`;
 }
 
 function renderWorkOrderActions(workOrder) {
@@ -456,6 +518,22 @@ function renderWorkPreparation() {
 
   const existingWorkOrder = state.workOrders.find(w => w.salesOrderId === selectedOrder.id);
   if (!existingWorkOrder) {
+    if (is3DOrder(selectedOrder)) {
+      els.workPrepDetail.innerHTML = `
+        <div class="status-box">
+          <h4>${selectedOrder.description}</h4>
+          <div class="work-type-badge printing3d">3D Printing</div>
+          <div class="list-meta">العميل: ${selectedOrder.customerName}</div>
+          <div class="list-meta">نوع الخامة: ${selectedOrder.printMaterialType || '—'} | اللون: ${selectedOrder.printMaterialColor || '—'}</div>
+          <div class="list-meta">الوزن: ${selectedOrder.printWeight || 0} جرام للقطعة × ${selectedOrder.quantity || 0} قطعة</div>
+          <div class="list-meta">زمن الطباعة: ${selectedOrder.printHours || 0} ساعة للقطعة</div>
+          <div class="list-meta">سعر الجرام: ${formatCurrency(selectedOrder.pricePerGram || pricingConfig.printing3D.materialPricePerGram)} | سعر الساعة: ${formatCurrency(selectedOrder.printHourlyRate || pricingConfig.printing3D.hourlyRate)}</div>
+          <div class="list-meta">سعر الوحدة: ${formatCurrency(selectedOrder.unitPrice || 0)} | الإجمالي: ${formatCurrency(selectedOrder.netSales || 0)}</div>
+          <div class="actions-row" style="margin-top:16px;"><button class="primary-btn" data-action="generate-work-order" data-id="${selectedOrder.id}">إنشاء أمر شغل 3D</button></div>
+        </div>
+      `;
+      return;
+    }
     const material = state.materials.find(m => m.id === selectedOrder.materialId) || state.materials[0];
     const available = Number(material?.quantity || 0);
     const requirement = calculateMaterialRequirement(selectedOrder, material);
@@ -483,8 +561,10 @@ function renderWorkPreparation() {
   els.workPrepDetail.innerHTML = `
     <div class="status-box">
       <h4>أمر الشغل ${existingWorkOrder.workOrderNumber}</h4>
+      <div class="work-type-badge ${is3DOrder(selectedOrder) ? 'printing3d' : 'laser'}">${is3DOrder(selectedOrder) ? '3D Printing' : 'ليزر'}</div>
       <div class="list-meta">العميل: ${existingWorkOrder.customerName}</div>
       <div class="list-meta">الوصف: ${existingWorkOrder.description}</div>
+      ${is3DOrder(selectedOrder) ? `<div class="list-meta">نوع الخامة: ${selectedOrder.printMaterialType || '—'} | اللون: ${selectedOrder.printMaterialColor || '—'}</div><div class="list-meta">الوزن: ${selectedOrder.printWeight || 0} جرام | زمن الطباعة: ${selectedOrder.printHours || 0} ساعة للقطعة | الكمية: ${selectedOrder.quantity || 0}</div>` : `<div class="list-meta">الخامة: ${existingWorkOrder.materialName || '—'} | اللون: ${existingWorkOrder.materialColor || '—'}</div><div class="list-meta">المقاس: ${existingWorkOrder.cutLength || 0} × ${existingWorkOrder.cutWidth || 0} سم | التشغيل: ${selectedOrder.laserMinutes || 0} دقيقة</div>`}
       <div class="list-meta">الحالة: <span class="badge ${existingWorkOrder.status === 'جاهز للتسليم' ? 'success' : existingWorkOrder.status === 'قيد التشغيل' ? 'warning' : 'info'}">${existingWorkOrder.status}</span></div>
       ${renderWorkOrderActions(existingWorkOrder)}
     </div>
@@ -505,6 +585,7 @@ function renderAll() {
   renderNavigation();
   renderDashboard();
   renderSalesOrders();
+  updateSalesOrderPricing();
   renderCustomers();
   renderMaterials();
   renderExpenses();
@@ -547,7 +628,8 @@ function editRecord(type, id) {
 
   if (type === 'order') {
     editing.salesOrderId = id;
-    Object.entries({ salesOrderNumber: record.orderNumber, salesOrderDate: record.orderDate, salesOrderCustomer: record.customerName, salesOrderPhone: record.phone, salesOrderDescription: record.description, salesOrderType: record.workType, salesOrderMaterial: record.materialId, salesOrderCutLength: record.cutLength, salesOrderCutWidth: record.cutWidth, salesOrderQuantity: record.quantity, salesOrderUnitPrice: record.unitPrice, salesOrderDiscount: record.discount, salesOrderDeposit: record.deposit, salesOrderDepositAccount: record.depositAccount, salesOrderDeliveryDate: record.deliveryDate, salesOrderPriority: record.priority, salesOrderStatus: record.status, salesOrderNotes: record.notes }).forEach(([field, value]) => setField(field, value));
+    Object.entries({ salesOrderNumber: record.orderNumber, salesOrderDate: record.orderDate, salesOrderCustomer: record.customerName, salesOrderPhone: record.phone, salesOrderDescription: record.description, salesOrderType: record.workType, salesOrderMaterial: record.materialId, salesOrderCutLength: record.cutLength, salesOrderCutWidth: record.cutWidth, salesOrderLaserMinutes: record.laserMinutes ?? record.laserHours, salesOrderQuantity: record.quantity, salesOrderUnitPrice: record.unitPrice, salesOrderPrintMaterialType: record.printMaterialType, salesOrderPrintMaterialColor: record.printMaterialColor, salesOrderPrintWeight: record.printWeight, salesOrderPrintHours: record.printHours, salesOrderSetupFee: record.setupFee, salesOrderDiscount: record.discount, salesOrderDeposit: record.deposit, salesOrderDepositAccount: record.depositAccount, salesOrderDeliveryDate: record.deliveryDate, salesOrderPriority: record.priority, salesOrderStatus: record.status, salesOrderNotes: record.notes }).forEach(([field, value]) => setField(field, value));
+    updateSalesOrderPricing();
     updateSelectedView('salesOrders');
   }
   if (type === 'customer') {
@@ -575,6 +657,26 @@ function editRecord(type, id) {
 function addSalesOrder(event) {
   event.preventDefault();
   if (!userCan('salesOrders')) return alert('ليس لديك صلاحية لإضافة أوامر البيع');
+  const workType = document.getElementById('salesOrderType').value;
+  const material = state.materials.find(item => item.id === document.getElementById('salesOrderMaterial').value);
+  const pricing = calculateOrderPricing({
+    workType,
+    quantity: Number(document.getElementById('salesOrderQuantity').value || 0),
+    laserMinutes: Number(document.getElementById('salesOrderLaserMinutes').value || 0),
+    laserHourlyRate: pricingConfig.laser.hourlyRate,
+    laserProfitMargin: pricingConfig.laser.profitMargin,
+    cutLength: Number(document.getElementById('salesOrderCutLength').value || 0),
+    cutWidth: Number(document.getElementById('salesOrderCutWidth').value || 0),
+    materialLength: Number(material?.length || 0),
+    materialWidth: Number(material?.width || 0),
+    materialUnitCost: Number(material?.unitCost || 0),
+    unitPrice: Number(document.getElementById('salesOrderUnitPrice').value || 0),
+    printWeight: Number(document.getElementById('salesOrderPrintWeight').value || 0),
+    printHours: Number(document.getElementById('salesOrderPrintHours').value || 0),
+    pricePerGram: pricingConfig.printing3D.materialPricePerGram,
+    printHourlyRate: pricingConfig.printing3D.hourlyRate,
+    setupFee: Number(document.getElementById('salesOrderSetupFee').value || 0),
+  });
   const order = {
     id: uid('sale'),
     orderNumber: document.getElementById('salesOrderNumber').value.trim(),
@@ -582,12 +684,22 @@ function addSalesOrder(event) {
     customerName: document.getElementById('salesOrderCustomer').value.trim(),
     phone: document.getElementById('salesOrderPhone').value.trim(),
     description: document.getElementById('salesOrderDescription').value.trim(),
-    workType: document.getElementById('salesOrderType').value,
+    workType,
+    printMaterialType: document.getElementById('salesOrderPrintMaterialType').value,
+    printMaterialColor: document.getElementById('salesOrderPrintMaterialColor').value.trim(),
     materialId: document.getElementById('salesOrderMaterial').value,
     cutLength: Number(document.getElementById('salesOrderCutLength').value || 0),
     cutWidth: Number(document.getElementById('salesOrderCutWidth').value || 0),
+    laserMinutes: Number(document.getElementById('salesOrderLaserMinutes').value || 0),
     quantity: Number(document.getElementById('salesOrderQuantity').value || 0),
-    unitPrice: Number(document.getElementById('salesOrderUnitPrice').value || 0),
+    unitPrice: pricing.unitPrice,
+    laserHourlyRate: pricingConfig.laser.hourlyRate,
+    printWeight: Number(document.getElementById('salesOrderPrintWeight').value || 0),
+    printHours: Number(document.getElementById('salesOrderPrintHours').value || 0),
+    pricePerGram: pricingConfig.printing3D.materialPricePerGram,
+    printHourlyRate: pricingConfig.printing3D.hourlyRate,
+    setupFee: Number(document.getElementById('salesOrderSetupFee').value || 0),
+    pricingBreakdown: pricing,
     discount: Number(document.getElementById('salesOrderDiscount').value || 0),
     deposit: Number(document.getElementById('salesOrderDeposit').value || 0),
     depositAccount: document.getElementById('salesOrderDepositAccount').value,
@@ -597,7 +709,7 @@ function addSalesOrder(event) {
     notes: document.getElementById('salesOrderNotes').value.trim(),
     paid: Number(document.getElementById('salesOrderDeposit').value || 0),
   };
-  order.totalSales = order.quantity * order.unitPrice;
+  order.totalSales = pricing.totalBeforeDiscount;
   order.netSales = Math.max(0, order.totalSales - order.discount);
   order.remaining = Math.max(0, order.netSales - order.deposit);
   const existingOrder = editing.salesOrderId && state.salesOrders.find(item => item.id === editing.salesOrderId);
@@ -629,6 +741,7 @@ function addSalesOrder(event) {
   state.ui.selectedSalesOrderId = existingOrder?.id || order.id;
   saveState();
   event.target.reset();
+  updateSalesOrderPricing();
   renderAll();
 }
 
@@ -843,6 +956,23 @@ function calculateMaterialRequirement(order, material) {
 function generateWorkOrder(orderId) {
   const order = state.salesOrders.find(o => o.id === orderId);
   if (!order) return;
+  if (is3DOrder(order)) {
+    const workOrder = {
+      id: uid('work'), createdAt: new Date().toISOString(), salesOrderId: order.id,
+      workOrderNumber: `WO-${String(state.workOrders.length + state.completedWorkOrders.length + 1).padStart(4, '0')}`,
+      customerName: order.customerName, description: order.description, quantity: order.quantity,
+      status: 'قيد التجهيز', operator: currentUser?.name || 'غير محدد', materialName: 'خامة طباعة 3D', printMaterialType: order.printMaterialType, printMaterialColor: order.printMaterialColor,
+      cutLength: 0, cutWidth: 0, requiredArea: 0, piecesPerSheet: 0, remainingPieces: 0,
+      remainingArea: 0, consumedSheets: 0, materialCost: Number(order.pricingBreakdown?.materialCost || 0) * Number(order.quantity || 0),
+      materialConsumed: 0, scrapQty: 0, notes: '', printWeight: order.printWeight, printHours: order.printHours,
+    };
+    state.workOrders.unshift(workOrder);
+    order.status = 'قيد التجهيز';
+    logActivity('إنشاء أمر شغل 3D', 'تجهيز الشغل', workOrder);
+    saveState();
+    renderAll();
+    return;
+  }
   const material = state.materials.find(m => m.id === order.materialId) || state.materials[0];
   if (!material || Number(material.length) <= 0 || Number(material.width) <= 0) {
     alert('لا يمكن إنشاء أمر الشغل قبل تسجيل طول وعرض اللوح للخامة المختارة.');
@@ -947,6 +1077,117 @@ function archiveWorkOrder(id) {
   renderAll();
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+}
+
+async function printFinalInvoice(orderId) {
+  const order = state.salesOrders.find(item => item.id === orderId);
+  const workOrder = state.completedWorkOrders.find(item => item.salesOrderId === orderId);
+  if (!order || !workOrder) return;
+  const pricing = order.pricingBreakdown || { totalBeforeDiscount: order.totalSales || 0 };
+  const detail = is3DOrder(order)
+    ? `طباعة 3D - خامة ${order.printMaterialType || '—'} | ${order.printWeight || 0} جم | ${order.printHours || 0} ساعة`
+    : `${order.workType} | ${order.cutLength || 0} × ${order.cutWidth || 0} سم`;
+  const invoiceWindow = window.open('', '_blank', 'width=900,height=700');
+  if (!invoiceWindow) return alert('اسمح بفتح النوافذ المنبثقة لطباعة الفاتورة.');
+  const logoUrl = new URL('data/invoice-assets/logo2.svg', window.location.href).href;
+  let logoDataUrl = logoUrl;
+  try {
+    const response = await fetch(logoUrl);
+    if (response.ok) {
+      const svgText = await response.text();
+      logoDataUrl = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svgText)))}`;
+    }
+  } catch {
+    logoDataUrl = logoUrl;
+  }
+  const dejavuLogoUrl = new URL('dd2.svg', window.location.href).href;
+  invoiceWindow.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>فاتورة ${escapeHtml(order.orderNumber)}</title><style>
+    :root{--ink:#101820;--muted:#334852;--brand:#173f56;--accent:#a21a1d;--line:#aebfc8;--soft:#e8f0f3}
+    *{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;color:var(--ink);max-width:820px;margin:0 auto;padding:30px;background:#fff}
+    header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:20px;border-bottom:5px solid var(--accent)}
+    .brand{display:flex;align-items:center;gap:12px}.brand img{width:62px;height:62px;object-fit:contain}.brand h1{margin:0;color:var(--brand);font-size:1.55rem}.brand p{margin:6px 0 0;color:var(--muted);font-weight:700}.invoice-id{text-align:left;line-height:1.9}.invoice-id strong{color:var(--brand)}
+    .section-title{display:flex;align-items:center;gap:10px;margin:25px 0 11px;color:var(--brand);font-size:1.05rem;font-weight:700}.section-title:after{content:"";height:2px;background:var(--line);flex:1}
+    .meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:15px;background:var(--soft);border:1px solid var(--line);border-radius:8px}.meta-item span{display:block;color:var(--muted);font-size:.78rem;margin-bottom:5px}.meta-item strong{font-size:.95rem}
+    table{width:100%;border-collapse:separate;border-spacing:0;margin-top:18px;border:1px solid var(--line);border-radius:8px;overflow:hidden}th,td{padding:13px 14px;text-align:right;border-bottom:1px solid var(--line)}th{background:var(--brand);color:#fff}tbody tr:nth-child(even){background:#f5f8fa}tbody tr:last-child td{border-bottom:0}
+    .summary{display:flex;margin-top:18px}.summary-box{min-width:320px;padding:15px 18px;border:2px solid #8fa8b4;border-right:7px solid var(--accent);border-radius:9px;background:#e0ebef;line-height:2}.grand{font-size:1.35rem;font-weight:800;color:#123b54}.muted{color:#263943;font-size:.9rem}
+    footer{display:flex;justify-content:center;align-items:center;gap:10px;margin-top:55px;padding-top:16px;border-top:2px solid var(--line);color:#263943;font-weight:700}footer img{width:42px;height:30px;object-fit:contain}
+    @media print{body{max-width:none;padding:18px}}
+  </style></head><body>
+    <header><div class="brand"><img src="${dejavuLogoUrl}" alt="Dejavu Decor"><div><h1>${escapeHtml(state.company.name)}</h1><p>فاتورة بيع</p></div></div><div class="invoice-id"><strong>فاتورة رقم ${escapeHtml(order.orderNumber)}</strong><br>التاريخ: ${escapeHtml(formatDate(order.orderDate))}</div></header>
+    <div class="section-title">بيانات العميل</div><div class="meta"><div class="meta-item"><span>اسم العميل</span><strong>${escapeHtml(order.customerName)}</strong></div><div class="meta-item"><span>رقم الهاتف</span><strong>${escapeHtml(order.phone || 'بدون هاتف')}</strong></div><div class="meta-item"><span>نوع الشغل</span><strong>${escapeHtml(order.workType)}</strong></div><div class="meta-item"><span>تاريخ التسليم</span><strong>${escapeHtml(formatDate(order.deliveryDate))}</strong></div></div>
+    <div class="section-title">تفاصيل الطلب</div><table><thead><tr><th>البيان</th><th>التفاصيل</th><th>الكمية</th><th>المبلغ</th></tr></thead><tbody><tr><td>${escapeHtml(order.description)}</td><td>${escapeHtml(detail)}</td><td>${escapeHtml(order.quantity)}</td><td>${formatCurrency(pricing.totalBeforeDiscount)}</td></tr><tr><td colspan="3">الخصم</td><td>- ${formatCurrency(order.discount)}</td></tr></tbody></table>
+    <div class="summary"><div class="summary-box"><div class="grand">الإجمالي: ${formatCurrency(order.netSales)}</div><div class="muted">المدفوع: ${formatCurrency(order.paid)}</div><div class="muted">المتبقي: ${formatCurrency(order.remaining)}</div></div></div>
+    <footer><img src="${logoDataUrl}" alt="ForgeX"><span>Part of ForgeX Group</span></footer>
+  </body></html>`);
+  invoiceWindow.document.close();
+  invoiceWindow.focus();
+  invoiceWindow.print();
+}
+
+function printStyledInvoice(orderId) {
+  const order = state.salesOrders.find(item => item.id === orderId);
+  const workOrder = state.completedWorkOrders.find(item => item.salesOrderId === orderId);
+  if (!order || !workOrder) return;
+  const pricing = order.pricingBreakdown || { totalBeforeDiscount: order.totalSales || 0 };
+  const detail = is3DOrder(order)
+    ? `طباعة 3D - خامة ${order.printMaterialType || '—'} | ${order.printWeight || 0} جم | ${order.printHours || 0} ساعة`
+    : `${order.workType} | ${order.cutLength || 0} × ${order.cutWidth || 0} سم`;
+  const invoiceWindow = window.open('', '_blank', 'width=900,height=700');
+  if (!invoiceWindow) return alert('اسمح بفتح النوافذ المنبثقة لطباعة الفاتورة.');
+  const forgeXLogoUrl = new URL('data/invoice-assets/logo2.svg', window.location.href).href;
+  const dejavuLogoUrl = new URL('dd2.svg', window.location.href).href;
+  invoiceWindow.document.write(`<!doctype html>
+    <html lang="ar" dir="rtl">
+      <head><meta charset="utf-8"><title>فاتورة ${escapeHtml(order.orderNumber)}</title>
+        <style>
+          :root{--ink:#17232d;--muted:#64727d;--brand:#2d586e;--accent:#a21a1d;--line:#d8e1e6;--soft:#f3f7f9}
+          *{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;color:var(--ink);max-width:820px;margin:0 auto;padding:32px;background:#fff}
+          header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:22px;border-bottom:4px solid var(--accent)}
+          .brand{display:flex;align-items:center;gap:12px}.brand img{width:62px;height:62px;object-fit:contain}.brand h1{margin:0;color:var(--brand);font-size:1.55rem}.brand p{margin:6px 0 0;color:var(--muted)}
+          .invoice-id{text-align:left;line-height:1.9}.invoice-id strong{font-size:1.05rem;color:var(--brand)}
+          .section-title{display:flex;align-items:center;gap:10px;margin:26px 0 12px;color:var(--brand);font-size:1rem}.section-title:after{content:"";height:1px;background:var(--line);flex:1}
+          .meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px;background:var(--soft);border:1px solid var(--line);border-radius:10px}.meta-item span{display:block;color:var(--muted);font-size:.78rem;margin-bottom:5px}.meta-item strong{font-size:.95rem}
+          table{width:100%;border-collapse:separate;border-spacing:0;margin-top:18px;overflow:hidden;border:1px solid var(--line);border-radius:10px}th,td{padding:13px 14px;text-align:right;border-bottom:1px solid var(--line)}th{background:var(--brand);color:#fff;font-weight:700}tbody tr:last-child td{border-bottom:0}
+          .summary{display:flex;justify-content:flex-start;margin-top:18px}.summary-box{min-width:310px;padding:16px 18px;border:1px solid var(--line);border-right:5px solid var(--accent);border-radius:10px;background:var(--soft);line-height:2}.summary-box .grand{font-size:1.3rem;font-weight:700;color:var(--brand)}.summary-box .muted{color:var(--muted);font-size:.88rem}
+          footer{display:flex;justify-content:center;align-items:center;gap:9px;margin-top:58px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:.86rem}footer img{width:31px;height:31px;object-fit:contain}
+          @media print{body{max-width:none;padding:18px}header{break-inside:avoid}table{break-inside:avoid}}
+        </style>
+      </head>
+      <body>
+        <header><div class="brand"><img src="${dejavuLogoUrl}" alt="Dejavu Decor"><div><h1>${escapeHtml(state.company.name)}</h1><p>فاتورة بيع</p></div></div><div class="invoice-id"><strong>فاتورة رقم ${escapeHtml(order.orderNumber)}</strong><br><span>التاريخ: ${escapeHtml(formatDate(order.orderDate))}</span></div></header>
+        <div class="section-title">بيانات العميل</div>
+        <div class="meta"><div class="meta-item"><span>اسم العميل</span><strong>${escapeHtml(order.customerName)}</strong></div><div class="meta-item"><span>رقم الهاتف</span><strong>${escapeHtml(order.phone || 'بدون هاتف')}</strong></div><div class="meta-item"><span>نوع الشغل</span><strong>${escapeHtml(order.workType)}</strong></div><div class="meta-item"><span>تاريخ التسليم</span><strong>${escapeHtml(formatDate(order.deliveryDate))}</strong></div></div>
+        <div class="section-title">تفاصيل الطلب</div>
+        <table><thead><tr><th>البيان</th><th>التفاصيل</th><th>الكمية</th><th>المبلغ</th></tr></thead><tbody><tr><td>${escapeHtml(order.description)}</td><td>${escapeHtml(detail)}</td><td>${escapeHtml(order.quantity)}</td><td>${formatCurrency(pricing.totalBeforeDiscount)}</td></tr><tr><td colspan="3">الخصم</td><td>- ${formatCurrency(order.discount)}</td></tr></tbody></table>
+        <div class="summary"><div class="summary-box"><div class="grand">الإجمالي: ${formatCurrency(order.netSales)}</div><div class="muted">المدفوع: ${formatCurrency(order.paid)}</div><div class="muted">المتبقي: ${formatCurrency(order.remaining)}</div></div></div>
+        <footer><img src="${forgeXLogoUrl}" alt="ForgeX"><span>Part of ForgeX Group</span></footer>
+      </body>
+    </html>`);
+  invoiceWindow.document.close();
+  invoiceWindow.focus();
+  invoiceWindow.print();
+}
+
+function printInvoice(orderId) {
+  const order = state.salesOrders.find(item => item.id === orderId);
+  const workOrder = state.completedWorkOrders.find(item => item.salesOrderId === orderId);
+  if (!order || !workOrder) return;
+  const pricing = order.pricingBreakdown || { totalBeforeDiscount: order.totalSales || 0 };
+  const detail = is3DOrder(order)
+    ? `طباعة 3D - خامة ${order.printMaterialType || '—'}: ${order.printWeight || 0} جم × ${formatCurrency(order.pricePerGram || 0)}، ${order.printHours || 0} ساعة × ${formatCurrency(order.printHourlyRate || 0)}`
+    : `${order.workType} - ${order.cutLength || 0} × ${order.cutWidth || 0} سم`;
+  const invoiceWindow = window.open('', '_blank', 'width=900,height=700');
+  if (!invoiceWindow) return alert('اسمح بفتح النوافذ المنبثقة لطباعة الفاتورة.');
+  const forgeXLogoUrl = new URL('data/invoice-assets/forgex-logo.svg', window.location.href).href;
+  const dejavuLogoUrl = new URL('dd2.svg', window.location.href).href;
+  invoiceWindow.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>فاتورة ${escapeHtml(order.orderNumber)}</title><style>body{font-family:Tahoma,Arial,sans-serif;color:#17232d;max-width:820px;margin:0 auto;padding:34px 30px;background:#fff}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #2d586e;padding-bottom:18px}.brand{display:flex;align-items:center;gap:12px}.brand img{width:64px;height:64px;object-fit:contain}.brand h1{margin:0;color:#2d586e;font-size:1.45rem}.brand .muted{margin-top:5px}h2{margin:28px 0 12px;color:#2d586e;font-size:1.05rem}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px;background:#f2f6f8;border:1px solid #d8e1e6;border-radius:8px}.meta strong,.meta span{display:block}.meta span{color:#61717c;margin-top:5px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{padding:12px;border-bottom:1px solid #d8e1e6;text-align:right}th{background:#edf3f6;color:#2d586e}.total{font-size:1.35rem;font-weight:700;text-align:left;margin-top:24px;padding-top:16px;border-top:2px solid #2d586e}.muted{color:#61717c}.footer{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:52px;padding-top:16px;border-top:1px solid #d8e1e6;color:#61717c;font-size:.85rem}.footer img{width:28px;height:28px;object-fit:contain}@media print{body{margin:0;max-width:none;padding:20px}}</style></head><body><header><div class="brand"><img src="${dejavuLogoUrl}" alt="Dejavu Decor"><div><h1>${escapeHtml(state.company.name)}</h1><div class="muted">فاتورة بيع</div></div></div><div><strong>رقم الفاتورة: ${escapeHtml(order.orderNumber)}</strong><br><span class="muted">التاريخ: ${escapeHtml(formatDate(order.orderDate))}</span></div></header><h2>بيانات العميل</h2><div class="meta"><div><span>اسم العميل</span><strong>${escapeHtml(order.customerName)}</strong></div><div><span>رقم الهاتف</span><strong>${escapeHtml(order.phone || 'بدون هاتف')}</strong></div><div><span>نوع الشغل</span><strong>${escapeHtml(order.workType)}</strong></div><div><span>تاريخ التسليم</span><strong>${escapeHtml(formatDate(order.deliveryDate))}</strong></div></div><table><thead><tr><th>البيان</th><th>التفاصيل</th><th>المبلغ</th></tr></thead><tbody><tr><td>${escapeHtml(order.description)}</td><td>${escapeHtml(detail)}</td><td>${formatCurrency(pricing.totalBeforeDiscount)}</td></tr><tr><td>الخصم</td><td></td><td>- ${formatCurrency(order.discount)}</td></tr></tbody></table><div class="total">الإجمالي: ${formatCurrency(order.netSales)}<br><span class="muted">المدفوع: ${formatCurrency(order.paid)} | المتبقي: ${formatCurrency(order.remaining)}</span></div><div class="footer"><img src="${forgeXLogoUrl}" alt="ForgeX"><span>Part of ForgeX Group</span></div></body></html>`);
+  invoiceWindow.document.close();
+  invoiceWindow.focus();
+  invoiceWindow.print();
+}
+
 function cancelWorkOrder(id) {
   const workOrder = state.workOrders.find(work => work.id === id);
   if (!workOrder || workOrder.status === 'ملغي') return;
@@ -977,6 +1218,7 @@ function handleButtonActions(event) {
 
   if (action === 'select-order' || action === 'prepare-order') {
     state.ui.selectedSalesOrderId = id;
+    if (action === 'prepare-order') updateSelectedView('workPrep');
     renderWorkPreparation();
   }
 
@@ -988,6 +1230,7 @@ function handleButtonActions(event) {
 
   if (action === 'generate-work-order') generateWorkOrder(id);
   if (action === 'archive-work-order') archiveWorkOrder(id);
+  if (action === 'print-invoice') printFinalInvoice(id);
   if (action === 'cancel-work-order') cancelWorkOrder(id);
   if (['start-job', 'pause-job', 'complete-job', 'quality-check', 'approve-quality', 'ready-delivery'].includes(action)) handleWorkAction(action, id);
 
@@ -1051,6 +1294,10 @@ function wireEvents() {
   els.navButtons.forEach(btn => btn.addEventListener('click', () => updateSelectedView(btn.dataset.view)));
 
   els.salesOrderForm.addEventListener('submit', addSalesOrder);
+  els.salesOrderType.addEventListener('change', updateSalesOrderPricing);
+  ['salesOrderMaterial', 'salesOrderQuantity', 'salesOrderCutLength', 'salesOrderCutWidth', 'salesOrderLaserMinutes', 'salesOrderPrintWeight', 'salesOrderPrintHours', 'salesOrderSetupFee'].map(id => document.getElementById(id)).filter(Boolean).forEach(field => {
+    field.addEventListener(field.tagName === 'SELECT' ? 'change' : 'input', updateSalesOrderPricing);
+  });
   els.customerForm.addEventListener('submit', addCustomer);
   els.materialForm.addEventListener('submit', addMaterial);
   els.expenseForm.addEventListener('submit', addExpense);
